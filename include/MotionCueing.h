@@ -8,7 +8,8 @@ extern "C" {
 #endif
 
 /* ── Schema version — bump when struct layout changes ────────────── */
-#define MCA_SCHEMA_VERSION  5
+/* v6: added output-stage intensity + per-axis gain/invert (see below).   */
+#define MCA_SCHEMA_VERSION  6
 #define MCA_NVS_KEY         "mca_cfg"
 #define MCA_NVS_NAMESPACE   "mca"
 
@@ -95,6 +96,13 @@ typedef struct {
     float sample_rate;        /* Hz — updated adaptively from packet rate */
     int   enabled;            /* master enable                            */
     int   preset;             /* current McaPreset enum value             */
+    /* ── Output stage (v6) — global intensity + per-axis gain/invert ──── */
+    /* Applied AFTER the washout/tilt chain, BEFORE mapRawToPosition. This  */
+    /* is the "final scale stage" that keeps app-SIL and ESP bit-exact.     */
+    /* Defaults (set by initMotionCueing): intensity=1, gain=1, invert=0.   */
+    float intensity;          /* global output multiplier (1.0 = unity)   */
+    float axis_gain[6];       /* per-axis output gain (1.0 = unity)        */
+    int   axis_invert[6];     /* per-axis polarity flip (0 = normal, 1 = invert) */
 } MotionCueingConfig;
 
 /* ── Biquad primitives ─────────────────────────────────────────────── */
@@ -137,6 +145,19 @@ void mcaSetChannelGain(MotionCueingConfig* cfg, int axis, float gain);
 void mcaSetChannelRateLimit(MotionCueingConfig* cfg, int axis, float limit);
 void mcaSetChannelHpEnabled(MotionCueingConfig* cfg, int axis, int enabled);
 void mcaSetChannelLpEnabled(MotionCueingConfig* cfg, int axis, int enabled);
+
+/* ── Output-stage setters/getters (v6): intensity + per-axis gain/invert */
+
+void  mcaSetIntensity(MotionCueingConfig* cfg, float intensity);
+float mcaGetIntensity(const MotionCueingConfig* cfg);
+void  mcaSetAxisGain(MotionCueingConfig* cfg, int axis, float gain);
+float mcaGetAxisGain(const MotionCueingConfig* cfg, int axis);
+void  mcaSetAxisInvert(MotionCueingConfig* cfg, int axis, int invert);
+int   mcaGetAxisInvert(const MotionCueingConfig* cfg, int axis);
+
+/* Apply the output stage (intensity * axis_gain * ±1) in place / to out[6]. */
+/* Bit-exact between app-SIL and ESP — call after processMotionCueing.       */
+void  mcaApplyOutputStage(const MotionCueingConfig* cfg, const float in[6], float out[6]);
 
 /* ── Tilt parameter setters ────────────────────────────────────────── */
 
