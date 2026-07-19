@@ -10,7 +10,19 @@
 #ifdef ESP_PLATFORM
 #include "nvs_flash.h"
 #include "nvs.h"
-#include "debug_uart.h"
+#include <stdio.h>
+#include <stdarg.h>
+// Self-contained debug hook — no dependency on the firmware's debug_uart/COBS code.
+// Firmware may provide a strong stewart_core_log() (e.g. route it through the COBS LOG
+// channel); the default weak impl is a no-op so stewart-core stays pure/portable.
+extern "C" __attribute__((weak)) void stewart_core_log(const char* msg) { (void)msg; }
+static inline void _sc_logf(const char* fmt, ...) {
+    char _b[192]; va_list _ap; va_start(_ap, fmt);
+    vsnprintf(_b, sizeof(_b), fmt, _ap); va_end(_ap);
+    stewart_core_log(_b);
+}
+#define DEBUG_PRINTF(...)  _sc_logf(__VA_ARGS__)
+#define DEBUG_PRINTLN(msg) stewart_core_log(msg)
 #else
 #define DEBUG_PRINTF(...)
 #define DEBUG_PRINTLN(...)
