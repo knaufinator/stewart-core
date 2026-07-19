@@ -254,6 +254,12 @@ void initMotionCueing(MotionCueingConfig* cfg, float sample_rate) {
         cfg->channels[i].hp.Q = 0.707f;
         cfg->channels[i].lp.Q = 0.707f;
     }
+    /* Output stage (v6) — unity defaults so it's a no-op until tuned */
+    cfg->intensity = 1.0f;
+    for (int i = 0; i < 6; i++) {
+        cfg->axis_gain[i]   = 1.0f;
+        cfg->axis_invert[i] = 0;
+    }
     cfg->tilt.fc = 0.5f;
     cfg->tilt.Q  = 0.707f;
     cfg->tilt.hp_fc = 0.3f;
@@ -451,6 +457,49 @@ void mcaSetChannelLpEnabled(MotionCueingConfig* cfg, int axis, int enabled) {
     cfg->channels[axis].lp_enabled = enabled ? 1 : 0;
 }
 
+/* ── Output-stage setters/getters (v6) ─────────────────────────────── */
+
+void mcaSetIntensity(MotionCueingConfig* cfg, float intensity) {
+    if (!cfg) return;
+    cfg->intensity = intensity;
+}
+
+float mcaGetIntensity(const MotionCueingConfig* cfg) {
+    return cfg ? cfg->intensity : 1.0f;
+}
+
+void mcaSetAxisGain(MotionCueingConfig* cfg, int axis, float gain) {
+    if (!cfg || axis < 0 || axis >= 6) return;
+    cfg->axis_gain[axis] = gain;
+}
+
+float mcaGetAxisGain(const MotionCueingConfig* cfg, int axis) {
+    if (!cfg || axis < 0 || axis >= 6) return 1.0f;
+    return cfg->axis_gain[axis];
+}
+
+void mcaSetAxisInvert(MotionCueingConfig* cfg, int axis, int invert) {
+    if (!cfg || axis < 0 || axis >= 6) return;
+    cfg->axis_invert[axis] = invert ? 1 : 0;
+}
+
+int mcaGetAxisInvert(const MotionCueingConfig* cfg, int axis) {
+    if (!cfg || axis < 0 || axis >= 6) return 0;
+    return cfg->axis_invert[axis];
+}
+
+void mcaApplyOutputStage(const MotionCueingConfig* cfg, const float in[6], float out[6]) {
+    if (!cfg) {
+        for (int i = 0; i < 6; i++) out[i] = in[i];
+        return;
+    }
+    for (int i = 0; i < 6; i++) {
+        float y = in[i] * cfg->intensity * cfg->axis_gain[i];
+        if (cfg->axis_invert[i]) y = -y;
+        out[i] = y;
+    }
+}
+
 /* ── Tilt parameter setters ────────────────────────────────────────── */
 
 void mcaSetTiltEnabled(MotionCueingConfig* cfg, int enabled) {
@@ -498,6 +547,13 @@ int mcaValidateConfig(const MotionCueingConfig* cfg) {
         if (cfg->channels[i].gain < -100.0f || cfg->channels[i].gain > 100.0f) return 0;
         if (cfg->channels[i].hp.Q < 0.0f || cfg->channels[i].hp.Q > 100.0f) return 0;
         if (cfg->channels[i].lp.Q < 0.0f || cfg->channels[i].lp.Q > 100.0f) return 0;
+    }
+    /* Output stage (v6): reject NaN/absurd values so bad NVS falls back  */
+    if (cfg->intensity != cfg->intensity) return 0;   /* NaN */
+    if (cfg->intensity < -100.0f || cfg->intensity > 100.0f) return 0;
+    for (int i = 0; i < 6; i++) {
+        if (cfg->axis_gain[i] != cfg->axis_gain[i]) return 0;   /* NaN */
+        if (cfg->axis_gain[i] < -100.0f || cfg->axis_gain[i] > 100.0f) return 0;
     }
     return 1;
 }
