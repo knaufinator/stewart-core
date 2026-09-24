@@ -488,6 +488,18 @@ int mcaGetAxisInvert(const MotionCueingConfig* cfg, int axis) {
     return cfg->axis_invert[axis];
 }
 
+float mcaSoftLimit(float value, float limit, float knee_frac) {
+    if (limit <= 0.0f) return 0.0f;
+    if (knee_frac < 0.0f) knee_frac = 0.0f;
+    if (knee_frac > 0.95f) knee_frac = 0.95f;
+    float knee = limit * knee_frac;
+    float mag  = fabsf(value);
+    if (mag <= knee) return value;
+    float span = limit - knee;                       /* > 0 */
+    float out  = knee + span * tanhf((mag - knee) / span);
+    return (value < 0.0f) ? -out : out;
+}
+
 void mcaApplyOutputStage(const MotionCueingConfig* cfg, const float in[6], float out[6]) {
     if (!cfg) {
         for (int i = 0; i < 6; i++) out[i] = in[i];

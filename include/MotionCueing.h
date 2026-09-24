@@ -159,6 +159,14 @@ int   mcaGetAxisInvert(const MotionCueingConfig* cfg, int axis);
 /* Bit-exact between app-SIL and ESP — call after processMotionCueing.       */
 void  mcaApplyOutputStage(const MotionCueingConfig* cfg, const float in[6], float out[6]);
 
+/* Soft limit: progressive damping into a hard stop (safety, all platforms).
+ * Linear (unity slope) below knee_frac*limit; above the knee the remaining
+ * travel is tanh-compressed so the output approaches ±limit asymptotically —
+ * actuators decelerate into the rail instead of slamming it. C1-continuous
+ * at the knee. Use as the LAST stage before actuator output on every rig
+ * (Mini-6DOF servo arms, full-size controller). */
+float mcaSoftLimit(float value, float limit, float knee_frac);
+
 /* ── Tilt parameter setters ────────────────────────────────────────── */
 
 void mcaSetTiltEnabled(MotionCueingConfig* cfg, int enabled);
